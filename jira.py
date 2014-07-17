@@ -14,7 +14,7 @@ log_dir = home_dir + "/.jira/log/"
 log_date_format = "%Y-%m-%d %H:%M:%S"
 
 class bcolors:
-    HEADER = '\033[1;37;44m' 
+    HEADER = '\033[1;37;44m'
     OKBLUE = '\033[94m'
     OKGREEN = '\033[92m'
     WARNING = '\033[93m'
@@ -70,7 +70,7 @@ def print_issue(issue):
     print '{project} / {key}'.format(project=issue['fields']['project']['name'], key=issue['key'])
     sys.stdout.write(bcolors.ENDC)
     print
-    print issue['fields']['summary'] + '\033[0m' 
+    print issue['fields']['summary'] + '\033[0m'
     print
     print string.ljust('Type', 10) + issue['fields']['issuetype']['name']
     print string.ljust('Priority', 10) + issue['fields']['priority']['name']
@@ -99,6 +99,10 @@ def get_issue(key):
     r = requests.get(issue_url, auth=(config['username'], config['password']), verify=False)
     return r.json()
 
+def get_branch_name_from_key(key):
+    issue = get_issue(key)
+    return key + '-' + issue['fields']['summary'].replace(' ', '-')
+
 def get_projects():
     project_url = config['endpoint'] + resource_project
     r = requests.get(project_url, auth=(config['username'], config['password']), verify=False)
@@ -123,6 +127,7 @@ def stop_progress(key):
     r = requests.post(transition_url, data=json.dumps(payload), headers=headers, auth=(config['username'], config['password']), verify=False)
     log_transition(key, 'Stop')
 
+
 def show_issue(key):
     issue = get_issue(key)
     print_issue(issue)
@@ -132,6 +137,10 @@ def show_comments(key):
     print bcolors.HEADER + str(comments['total']) + ' comments on  ' + key + bcolors.ENDC
     for comment in comments['comments']:
         print_comment_oneline(comment)
+
+def create_branch(key):
+    branch_name = get_branch_name_from_key(key)
+    print branch_name
 
 def list_issues():
     issues = get_issues()
@@ -169,6 +178,7 @@ def parse_user_args():
     parser.add_argument("--start", help="Start Progress", action="store_true")
     parser.add_argument("--stop", help="Stop Progress", action="store_true")
     parser.add_argument("--time", help="Show time logged", action="store_true")
+    parser.add_argument("--branch", help="Create a branch in the current repo", action="store_true")
     parser.add_argument("-c", help="Comment on issue.", action="store", dest="comment_body")
     return parser.parse_args()
 
@@ -191,6 +201,8 @@ if args.issuekey:
         comment_on_issue(args.issuekey, args.comment_body)
     elif args.comments:
         show_comments(args.issuekey)
+    elif args.branch:
+        create_branch(args.issuekey)
     elif args.time:
         print_time_logged(args.issuekey)
     else:
