@@ -1,7 +1,10 @@
 #!/usr/bin/env python
 
-import argparse, requests, json, string, sys, datetime, math
-from os.path import expanduser
+import argparse, requests, json, string, sys, datetime, math, getpass, pprint
+from os.path import expanduser, isfile
+from os import makedirs
+
+requests.packages.urllib3.disable_warnings()
 
 resource_search = "/rest/api/2/search"
 resource_issue = "/rest/api/2/issue/"
@@ -21,9 +24,6 @@ class bcolors:
     FAIL = '\033[91m'
     ENDC = '\033[0m'
     BOLD_CYAN = '\033[1;36m'
-
-def human_date_difference(now, then):
-    print now
 
 def log_transition(issueKey, transition):
     log_file = open(log_dir + issueKey + '.log', 'a')
@@ -55,6 +55,7 @@ def time_logged(issueKey):
 def print_time_logged(issueKey):
     logged = time_logged(issueKey)
     print '%d minutes, %d seconds logged for issue %s' % (math.floor(logged / 60), logged % 60, issueKey)
+    sys.exit()
 
 def load_config():
     import ConfigParser
@@ -64,6 +65,27 @@ def load_config():
     password = Config.get('Authentication', 'password')
     endpoint = Config.get('Authentication', 'endpoint')
     return {'username' : username, 'password' : password, 'endpoint' : endpoint }
+
+def first_time_setup():
+    endpoint = raw_input('Endpoint: ')
+    username = raw_input('Username: ')
+    password = getpass.getpass()
+
+    import ConfigParser
+    config = ConfigParser.RawConfigParser()
+
+    config.add_section('Authentication')
+    config.set('Authentication', 'username', username)
+    config.set('Authentication', 'password', password)
+    config.set('Authentication', 'endpoint', endpoint)
+
+    try:
+        makedirs(log_dir)
+    except:
+        print 'Bad practice is bad.'
+
+    with open(config_path, 'w+') as configfile:
+        config.write(configfile)
 
 def print_issue(issue):
     sys.stdout.write(bcolors.HEADER)
@@ -99,6 +121,11 @@ def get_issue(key):
     r = requests.get(issue_url, auth=(config['username'], config['password']), verify=False)
     return r.json()
 
+def get_issue_transitions(key):
+    transition_url = config['endpoint'] + resource_issue + key + '/transitions'
+    r = requests.get(transition_url, auth=(config['username'], config['password']), verify=False)
+    return r.json()
+
 def get_branch_name_from_key(key):
     issue = get_issue(key)
     return key + '-' + issue['fields']['summary'].replace(' ', '-')
@@ -131,6 +158,12 @@ def stop_progress(key):
 def show_issue(key):
     issue = get_issue(key)
     print_issue(issue)
+    show_transitions(key)
+
+def show_transitions(key):
+    transitions = get_issue_transitions(key)
+    for index, transition in enumerate(transitions['transitions']):
+        print '%d   %s' % (index, transition['name'])
 
 def show_comments(key):
     comments = get_comments(key)
@@ -179,18 +212,22 @@ def parse_user_args():
     parser.add_argument("--stop", help="Stop Progress", action="store_true")
     parser.add_argument("--time", help="Show time logged", action="store_true")
     parser.add_argument("--branch", help="Create a branch in the current repo", action="store_true")
+    parser.add_argument("--transitions", help="Show possible transitions.", action="store_true")
     parser.add_argument("-c", help="Comment on issue.", action="store", dest="comment_body")
     return parser.parse_args()
+
+if isfile(config_path) is False:
+    first_time_setup()
 
 config = load_config()
 
 args = parse_user_args()
 
-if args.list:
-    list_issues()
-
 if args.projects:
     list_projects()
+
+if args.list:
+    list_issues()
 
 if args.issuekey:
     if args.start:
@@ -205,5 +242,7 @@ if args.issuekey:
         create_branch(args.issuekey)
     elif args.time:
         print_time_logged(args.issuekey)
+    elif args.transitions:
+        show_transitions(args.issuekey)
     else:
         show_issue(args.issuekey)
