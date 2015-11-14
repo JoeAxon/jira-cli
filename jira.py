@@ -140,20 +140,13 @@ def get_comments(key):
     r = requests.get(comment_url, auth=(config['username'], config['password']), verify=False)
     return r.json()
 
-def start_progress(key):
-    payload = {"transition" : {"id" : "4"}}
+def transition_by_index(key, index):
+    transition = get_issue_transitions(key)['transitions'][index]
+    payload = {"transition" : {"id" : transition['id']}}
     transition_url = config['endpoint'] + resource_issue + key + '/transitions'
     headers = {'content-type': 'application/json'}
     r = requests.post(transition_url, data=json.dumps(payload), headers=headers, auth=(config['username'], config['password']), verify=False)
-    log_transition(key, 'Start')
-
-def stop_progress(key):
-    payload = {"transition" : {"id" : "301"}}
-    transition_url = config['endpoint'] + resource_issue + key + '/transitions'
-    headers = {'content-type': 'application/json'}
-    r = requests.post(transition_url, data=json.dumps(payload), headers=headers, auth=(config['username'], config['password']), verify=False)
-    log_transition(key, 'Stop')
-
+    log_transition(key,transition['name'])
 
 def show_issue(key):
     issue = get_issue(key)
@@ -214,6 +207,7 @@ def parse_user_args():
     parser.add_argument("--branch", help="Create a branch in the current repo", action="store_true")
     parser.add_argument("--transitions", help="Show possible transitions.", action="store_true")
     parser.add_argument("-c", help="Comment on issue.", action="store", dest="comment_body")
+    parser.add_argument("-t", help="Transition", action="store", dest="transition_index")
     return parser.parse_args()
 
 if isfile(config_path) is False:
@@ -230,10 +224,9 @@ if args.list:
     list_issues()
 
 if args.issuekey:
-    if args.start:
-        start_progress(args.issuekey)
-    elif args.stop:
-        stop_progress(args.issuekey)
+    if args.transition_index:
+        transition_by_index(args.issuekey, int(args.transition_index))
+        show_issue(args.issuekey)
     if args.comment_body:
         comment_on_issue(args.issuekey, args.comment_body)
     elif args.comments:
