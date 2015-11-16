@@ -155,6 +155,7 @@ def show_issue(key):
 
 def show_transitions(key):
     transitions = get_issue_transitions(key)
+    print bcolors.HEADER + 'Available transitions' + bcolors.ENDC
     for index, transition in enumerate(transitions['transitions']):
         print '%d   %s' % (index, transition['name'])
 
